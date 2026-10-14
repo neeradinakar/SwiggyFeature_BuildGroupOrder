@@ -4,15 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory Game</title>
+    <script>
+        (() => {
+            let savedTheme = null;
+            try {
+                savedTheme = localStorage.getItem('memoryGameTheme');
+            } catch {
+            }
+
+            const theme = savedTheme === 'dark' || savedTheme === 'light' ?
+                savedTheme :
+                (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
     <style>
         /* Reset default styles and set up CSS custom properties for theming */
         :root {
-            --primary-color: #2196f3;
+            color-scheme: light;
+            --primary-color: #1976d2;
+            --primary-hover: #1565c0;
+            --primary-active: #0d47a1;
             --background-color: #f5f5f5;
+            --surface-color: #ffffff;
             --card-back: #1976d2;
             --card-front: #ffffff;
             --text-color: #333333;
-            --success-color: #4caf50;
+            --muted-text-color: #555555;
+            --success-color: #2e7d32;
+            --focus-color: #0d47a1;
+            --surface-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            --border-color: #d1d5db;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --primary-color: #236b78;
+            --primary-hover: #2b7c89;
+            --primary-active: #174953;
+            --background-color: #12191b;
+            --surface-color: #202a2d;
+            --card-back: #236b78;
+            --card-front: #283639;
+            --text-color: #f1f5f4;
+            --muted-text-color: #c6d1d0;
+            --success-color: #8bd49a;
+            --focus-color: #9bd9e1;
+            --surface-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            --border-color: #526468;
         }
 
         * {
@@ -43,6 +82,12 @@
             margin-bottom: 2rem;
         }
 
+        .theme-toggle {
+            position: relative;
+            z-index: 1;
+            margin-top: 1rem;
+        }
+
         .header h1 {
             font-size: 2.5rem;
             margin-bottom: 0.5rem;
@@ -54,10 +99,10 @@
             justify-content: space-around;
             flex-wrap: wrap;
             gap: 1rem;
-            background: white;
+            background: var(--surface-color);
             padding: 1rem;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: var(--surface-shadow);
             margin-bottom: 2rem;
         }
 
@@ -88,11 +133,16 @@
         }
 
         button:hover {
-            background-color: #1565c0;
+            background-color: var(--primary-hover);
         }
 
         button.active {
-            background-color: #0d47a1;
+            background-color: var(--primary-active);
+        }
+
+        button:focus-visible {
+            outline: 3px solid var(--focus-color);
+            outline-offset: 3px;
         }
 
         /* Game grid styles with responsive layout */
@@ -123,7 +173,7 @@
         }
 
         .card:focus {
-            outline: 3px solid var(--primary-color);
+            outline: 3px solid var(--focus-color);
             outline-offset: 2px;
         }
 
@@ -154,6 +204,10 @@
             transform: rotateY(180deg);
         }
 
+        .card.matched .card-front {
+            box-shadow: inset 0 0 0 3px var(--success-color), var(--surface-shadow);
+        }
+
         .card-back {
             background: var(--card-back);
             color: white;
@@ -173,12 +227,13 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--surface-color);
             padding: 2rem;
             border-radius: 8px;
             text-align: center;
             max-width: 400px;
             width: 90%;
+            box-shadow: var(--surface-shadow);
         }
 
         /* Best scores section */
@@ -190,9 +245,10 @@
         .scores-list {
             max-width: 600px;
             margin: 1rem auto;
-            background: white;
+            background: var(--surface-color);
             padding: 1rem;
             border-radius: 8px;
+            box-shadow: var(--surface-shadow);
         }
 
         /* Responsive design adjustments */
@@ -218,6 +274,7 @@
         <header class="header">
             <h1>Memory Game</h1>
             <p>Match all the pairs to win! Use keyboard or mouse to play.</p>
+            <button class="theme-toggle" type="button" aria-pressed="false">Dark theme</button>
         </header>
 
         <!-- Game statistics panel -->
@@ -286,8 +343,22 @@
             modal: document.querySelector('.modal'),
             finalStats: document.querySelector('.final-stats'),
             gridButtons: document.querySelectorAll('.grid-btn'),
-            scoresList: document.querySelector('.scores-list')
+            scoresList: document.querySelector('.scores-list'),
+            themeToggle: document.querySelector('.theme-toggle')
         };
+
+        const themeStorageKey = 'memoryGameTheme';
+        const currentTheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+        elements.themeToggle.setAttribute('aria-pressed', String(currentTheme === 'dark'));
+        elements.themeToggle.addEventListener('click', () => {
+            const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = nextTheme;
+            elements.themeToggle.setAttribute('aria-pressed', String(nextTheme === 'dark'));
+            try {
+                localStorage.setItem(themeStorageKey, nextTheme);
+            } catch {
+            }
+        });
 
         // Card symbols (emojis) for both grid sizes
         const symbols = {
