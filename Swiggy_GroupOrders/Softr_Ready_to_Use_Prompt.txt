@@ -1,0 +1,140 @@
+SOFTR BUILD PROMPT — SWIGGY TOGETHER
+Copy and paste this entire prompt into Softr AI.
+
+PROJECT
+Build a polished, responsive web application named “Swiggy Together” for friends to coordinate a group meal order from one restaurant, add items to a shared cart, and track each person’s share of the bill.
+
+SOURCE OF TRUTH — MUST FOLLOW
+- Use ONLY my connected Airtable data source named “Swiggy Group Ordering”.
+- Use these six existing Airtable tables only: Users, Restaurants, Menu_Items, Group_Orders, Order_Items, Bill_Splits.
+- Do not create Softr Databases, Softr default tables, sample records, mock data, or replacement data sources.
+- If a table or field is missing, report the missing item instead of silently creating a substitute.
+- Treat Airtable as the source of truth. Use real records and connected-record relationships, not hard-coded examples.
+
+IMPORTANT DATA MODEL / AIRTABLE SETUP
+The supplied CSVs are header-only templates. Import each CSV as its corresponding Airtable table, then configure field types and relationships before connecting Softr.
+- Use each table’s *_ID field as its stable unique identifier (or Airtable primary field if preferred).
+- Convert foreign-key fields into Airtable linked-record fields after import:
+  - Menu_Items.Restaurant_ID → Restaurants
+  - Group_Orders.Host_User_ID → Users
+  - Group_Orders.Restaurant_ID → Restaurants
+  - Order_Items.Group_Order_ID → Group_Orders
+  - Order_Items.User_ID → Users
+  - Order_Items.Menu_Item_ID → Menu_Items
+  - Bill_Splits.Group_Order_ID → Group_Orders
+  - Bill_Splits.User_ID → Users
+- Configure reciprocal linked fields as needed. In Softr, display linked record names rather than raw IDs.
+- Recommended field types: Email for Users.Email; phone for Users.Phone; URL for image fields; checkbox for Is_Active, Is_Veg, Is_Available; number/currency for ratings, quantities and INR amounts; date/time for timestamps/deadlines; single select for statuses, categories, cuisine and payment fields.
+- Suggested allowed values:
+  - Group_Orders.Status: Open, Locked, Placed, Preparing, Delivering, Delivered, Cancelled
+  - Order_Items.Item_Status: Active, Removed
+  - Bill_Splits.Payment_Status: Pending, Paid, Failed, Waived
+  - Bill_Splits.Payment_Method: UPI, Cash, Other
+  - Bill_Splits.Split_Calculation_Method: Equal, ByItems, Custom
+- Set INR currency fields to Indian Rupees where supported. Keep the underlying numeric value for calculations.
+
+APP PURPOSE & CORE RULES
+- One group order is associated with exactly one restaurant.
+- Only authenticated users can create/join group orders, add items, view group carts, or see bill splits.
+- Users should only edit/remove their own cart items. The host can manage the group order and lock it.
+- Once an order is Locked or beyond, prevent members from adding or changing items.
+- A Shareable_Code lets authenticated friends find/join an Open group order. Do not expose private delivery addresses or individual bill data to public visitors.
+- Do not claim that a UPI payment was actually processed. “Pay via UPI” should open a configured UPI/payment link if one exists; only mark a share Paid after user confirmation or a verified payment integration. If no payment integration exists, clearly label the action as “Mark as paid” and record that it is user-reported.
+- Do not invent Swiggy APIs or imply this app submits orders to Swiggy. This is a coordination and bill-splitting application unless an actual integration is configured.
+- If Softr cannot perform an operation natively, implement the closest supported Airtable/Softr workflow and clearly identify any required Airtable automation, Softr action, or external integration.
+
+BRAND & VISUAL DESIGN
+- Brand name: Swiggy Together.
+- Primary orange: #FC8019; dark slate text: #282C3F; page background: #F4F4F5; white card surfaces.
+- Use 12px rounded corners, subtle shadows, generous spacing, accessible contrast, clear empty states, and consistent iconography.
+- Mobile-first layout: thumb-friendly controls, sticky group-cart summary where practical, responsive restaurant/menu cards, and readable tables that become cards on small screens.
+- Visual tone: modern food-ordering product, fast and friendly, professional rather than cluttered.
+- Use real Airtable image URLs if present; never create fake restaurant or menu records.
+
+GLOBAL NAVIGATION & AUTH
+- Header navigation: Home (/), Restaurants (/restaurants), Active Group Orders (/group-orders), My Split Bills (/my-splits).
+- Right-side header action: Sign In when logged out; Profile / Sign Out when logged in.
+- Do not put record-detail pages in the top navigation.
+- Public pages: Home and Restaurants directory.
+- Require sign-in for Group Orders, Group Order Details, menu ordering actions, and My Split Bills. Redirect unauthenticated visitors to the sign-in flow and return them to their intended page after login if supported.
+- Map the authenticated Softr user to Users using a reliable unique field, preferably email. Do not trust a user-selected User_ID as proof of identity.
+- Enforce record-level visibility and editing restrictions wherever Softr supports them. Never rely on hiding a button alone for security.
+
+PAGE 1 — HOME (/)
+- Hero heading: “Order Together, Share the Feast”
+- Subtitle: “Start a group meal session, let friends add their favorite dishes, and split the bill seamlessly.”
+- Primary CTA: “Browse Restaurants” → /restaurants
+- Secondary CTA: “Join Group Order” → /group-orders
+- Include a concise three-step explainer: Create a group, invite friends, split the bill.
+- Add a clear sign-in prompt for logged-out users who try to start or join a group.
+
+PAGE 2 — RESTAURANTS DIRECTORY (/restaurants)
+- Connect a card/list block to Restaurants.
+- Card title: Restaurant_Name.
+- Show Cuisine, Rating, Delivery_Time_Mins formatted as “35 mins”, Address, and Image_URL when available.
+- Enable search by Restaurant_Name and filter by Cuisine.
+- Show only active restaurants (Is_Active = true), where the field exists and is configured.
+- Selecting a restaurant opens the Restaurant Menu page and passes the selected restaurant record context.
+- Include loading, empty-search, and no-results states.
+
+PAGE 3 — RESTAURANT MENU (/restaurant-menu)
+- This is a restaurant detail page, not a global navigation item.
+- Header/detail block uses the selected Restaurants record: Restaurant_Name, Cuisine, Rating, Address, delivery time and image where available.
+- Menu list is sourced from Menu_Items and filtered to the selected restaurant through the linked Restaurant relationship. Show only Is_Available = true.
+- Each menu card displays Item_Name, Description, Category, Price_INR formatted as ₹, and a clear Veg/Non-Veg badge (green for Veg, red for Non-Veg).
+- “+ Add to Group Order” opens a form/modal. Require the user to choose one of their own eligible Open group orders for this same restaurant, plus Quantity (minimum 1) and optional Special_Instructions.
+- Set User_ID from the authenticated user; set Menu_Item_ID and Unit_Price_INR from the selected menu item; calculate Subtotal_INR = Quantity × Unit_Price_INR. Do not allow users to spoof these fields in the form.
+- If the user has no eligible group order, offer “Create a group order” and explain that it must be for this restaurant.
+- Disable ordering for unavailable menu items and locked/closed groups.
+
+PAGE 4 — ACTIVE GROUP ORDERS (/group-orders)
+- Logged-in users only. Connect a list/grid block to Group_Orders.
+- Show Open, Locked, Placed, Preparing, and Delivering orders by default; exclude Delivered and Cancelled unless the user selects a history filter.
+- Card fields: Group_Name, linked Restaurant_Name, Status, Shareable_Code, Total_Amount_INR formatted as ₹, and Order_Deadline if present.
+- Add a prominent “Create New Group Order” action.
+- Create form fields: Group_Name, Restaurant_ID, Delivery_Address, Order_Deadline (optional), Notes (optional). Set Host_User_ID from the authenticated user; generate a unique Shareable_Code and set Created_At automatically if Softr/Airtable supports it. Default Status = Open.
+- Do not let users submit a host identity or totals that they can manipulate.
+- Provide “Join with code” flow that finds an Open group by Shareable_Code. Confirm the restaurant and group name before joining.
+- Clicking a card opens Group Order Details and passes the selected Group_Orders record.
+
+PAGE 5 — GROUP ORDER DETAILS (/group-order-details)
+A. GROUP HEADER
+- Display Group_Name, host name, restaurant name, Status, Shareable_Code, Delivery_Address (members only), Order_Deadline, and total.
+- Provide a copy/share invite action for Shareable_Code or a shareable link if supported.
+- Show “Lock Group Order” to the host only. Confirm before locking. Once locked, prevent new item additions and edits.
+- Only the host may change group-level settings or status where applicable.
+
+B. SHARED CART
+- Show Order_Items filtered to the current Group_Orders record.
+- Display linked Menu Item name, added-by user name, Quantity, Unit_Price_INR, Subtotal_INR and Item_Status.
+- Allow each member to update/remove only their own items while the order is Open. Host moderation may be provided if supported.
+- Provide clear empty-cart and locked-cart states.
+
+C. TOTALS & BILL SPLITS
+- Show item subtotal, delivery fee, tax and total separately when the fields are populated. Make calculation rules transparent.
+- Display Bill_Splits for the current group: member name, Individual_Share_INR, Payment_Status and Payment_Method.
+- Do not create duplicate bill-split records when a group is recalculated. If native Softr actions cannot safely calculate totals and create/update one split per member, explain and configure an Airtable automation or supported workflow.
+- Make the split method clear. Prefer each user’s item subtotal plus a documented allocation of delivery fees/taxes, or support a clearly selected Equal split. Do not silently present an arbitrary split as accurate.
+- “Mark My Share Paid” must update only the current authenticated user’s own split. Ask for confirmation and record Paid_At when supported. If payment is not verified by an integration, label this as user-reported.
+- Never allow one member to mark another member’s share as paid.
+
+PAGE 6 — MY SPLIT BILLS (/my-splits)
+- Logged-in users only.
+- Table/list connected to Bill_Splits, filtered to the authenticated user’s linked Users record.
+- Default view shows Payment_Status = Pending; provide a way to view Paid and historical shares.
+- Columns/cards: Group_Order_ID (display Group_Name), Restaurant_Name if available through the linked group, Individual_Share_INR, Payment_Status, Payment_Method, and date.
+- “Pay via UPI” may open a configured payment/UPI link. Do not mark the share paid merely because the link was opened. If no verified payment integration exists, provide a separate “Mark as paid” confirmation action.
+- Ensure users cannot view or update other users’ split records.
+
+FUNCTIONAL & QUALITY REQUIREMENTS
+- Use real Airtable-connected blocks, detail pages, filters, forms, and actions. Avoid placeholder content.
+- Set correct record context and linked-record filters on every detail page.
+- Include form validation, success/error messages, loading states, empty states, and confirmation for locking/removing items.
+- Format money in INR with ₹ and two decimal places where appropriate; format delivery times in minutes.
+- Make the experience accessible by keyboard and screen reader, with visible focus states and labels.
+- Test desktop, tablet, and mobile layouts.
+- Do not expose API keys or secrets in frontend fields.
+- If Softr/Airtable plan limitations prevent a requested permission, workflow, calculation, or conditional filter, list the exact limitation and the safest supported implementation instead of pretending it works.
+
+DELIVERABLE
+Build the app pages and connect them to the existing Airtable base “Swiggy Group Ordering”. Use the six tables specified above. Do not create sample data or extra tables. At the end, provide a short implementation checklist identifying any Airtable field-type changes, automations, authentication mappings, or payment integrations that still require manual setup.
